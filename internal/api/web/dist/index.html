@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>高压蒸汽灭菌热穿透校核</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main>
+      <section class="panel">
+        <h1>高压蒸汽灭菌热穿透校核</h1>
+        <p id="backend-state">正在读取后端状态...</p>
+        <form id="create-run">
+          <label>设备标识 <input name="device_id" value="autoclave-01" required></label>
+          <label>运行业务键 <input name="business_key" value="run-demo-001" required></label>
+          <button type="submit">创建修订</button>
+        </form>
+        <div class="actions">
+          <button id="load-demo" type="button">上传演示记录</button>
+          <button id="freeze" type="button">冻结输入</button>
+          <button id="start" type="button">启动分析</button>
+          <button id="finalize" type="button">定版证据</button>
+          <button id="download" type="button">下载证据</button>
+        </div>
+        <section class="summary">
+          <span id="revision-state">尚未创建修订</span>
+          <span id="job-state">任务未启动</span>
+        </section>
+        <pre id="api-output"></pre>
+      </section>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
