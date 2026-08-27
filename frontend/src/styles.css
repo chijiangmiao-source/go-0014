@@ -1,0 +1,74 @@
+:root {
+  color-scheme: light;
+  font-family: Arial, "Microsoft YaHei", sans-serif;
+  background: #f4f7f6;
+  color: #1d2528;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.panel {
+  width: min(760px, 100%);
+  background: #ffffff;
+  border: 1px solid #d8e1df;
+  border-radius: 8px;
+  padding: 24px;
+}
+
+h1 {
+  margin: 0 0 16px;
+  font-size: 28px;
+}
+
+form {
+  display: grid;
+  gap: 12px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.summary {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  color: #40515a;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+}
+
+input,
+button {
+  min-height: 40px;
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 6px;
+  background: #116149;
+  color: white;
+  cursor: pointer;
+}
+
+pre {
+  overflow: auto;
+  background: #eef3f1;
+  padding: 12px;
+}
