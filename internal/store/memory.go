@@ -166,6 +166,33 @@ func (m *MemoryRepository) SaveEvidence(pkg domain.EvidencePackage) error {
 	return nil
 }
 
+// FinalizeRevision atomically persists the terminal-state migration, the
+// state event and the evidence archive under a single lock, mirroring the
+// single-transaction guarantee of the SQLite repository. No partial result
+// is observable if any step would fail.
+func (m *MemoryRepository) FinalizeRevision(revision domain.Revision, event domain.StateEvent, pkg domain.EvidencePackage) (domain.EvidencePackage, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	record, ok := m.records[revision.ID]
+	if !ok {
+		return domain.EvidencePackage{}, domain.NewInputError(domain.CodeInvalidInput, "revision not found", revision.ID)
+	}
+	if record.Revision.Version+1 != revision.Version {
+		return domain.EvidencePackage{}, domain.NewStateError(domain.CodeVersionConflict, "stored revision changed")
+	}
+	// Stage every mutation against copies first so a failure leaves the
+	// stored record untouched.
+	staged := record
+	staged.Revision = revision
+	stagedEvid := pkg
+	stagedEvid.Bytes = append([]byte(nil), pkg.Bytes...)
+	staged.Evidence = &stagedEvid
+	m.records[revision.ID] = staged
+	event.Ordinal = len(m.events[revision.ID]) + 1
+	m.events[revision.ID] = append(m.events[revision.ID], event)
+	return stagedEvid, nil
+}
+
 func (m *MemoryRepository) Evidence(id string) (domain.EvidencePackage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

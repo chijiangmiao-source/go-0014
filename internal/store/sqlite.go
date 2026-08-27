@@ -248,6 +248,46 @@ func (s *SQLiteRepository) SaveEvidence(pkg domain.EvidencePackage) error {
 	return err
 }
 
+// FinalizeRevision atomically persists the terminal-state migration, the
+// state event and the evidence archive in a single transaction. Committing
+// only happens once all three writes succeed; any failure rolls the whole
+// transaction back so a sealed state is never left without its evidence.
+func (s *SQLiteRepository) FinalizeRevision(revision domain.Revision, event domain.StateEvent, pkg domain.EvidencePackage) (domain.EvidencePackage, error) {
+	ctx := context.Background()
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.EvidencePackage{}, domain.NewTemporaryError("SQLite transaction could not start", err.Error())
+	}
+	defer rollback(tx)
+	resultBytes, err := json.Marshal(revision.Result)
+	if err != nil {
+		return domain.EvidencePackage{}, err
+	}
+	res, err := tx.ExecContext(ctx, `update revisions set state = ?, lock_version = ?, snapshot_hash = ?, algorithm_version = ?, conclusion = ?, result_json = ? where id = ? and lock_version = ?`,
+		revision.State, revision.Version, revision.SnapshotHash, revision.AlgorithmVersion, revision.Conclusion, nullableJSON(resultBytes, revision.Result != nil), revision.ID, revision.Version-1)
+	if err != nil {
+		return domain.EvidencePackage{}, err
+	}
+	rows, _ := res.RowsAffected()
+	if rows != 1 {
+		return domain.EvidencePackage{}, domain.NewStateError(domain.CodeVersionConflict, "stored revision changed")
+	}
+	if err := insertEvent(ctx, tx, revision.ID, event); err != nil {
+		return domain.EvidencePackage{}, err
+	}
+	pkg.RevisionID = revision.ID
+	pkg.Version = revision.Version
+	if _, err := tx.ExecContext(ctx, `insert into evidence_packages(revision_id, bytes, sha256, length, complete, version) values(?, ?, ?, ?, ?, ?)
+		on conflict(revision_id) do update set bytes = excluded.bytes, sha256 = excluded.sha256, length = excluded.length, complete = excluded.complete, version = excluded.version`,
+		pkg.RevisionID, pkg.Bytes, pkg.Hash, pkg.Length, boolInt(pkg.Complete), pkg.Version); err != nil {
+		return domain.EvidencePackage{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.EvidencePackage{}, err
+	}
+	return pkg, nil
+}
+
 func (s *SQLiteRepository) Evidence(id string) (domain.EvidencePackage, error) {
 	var pkg domain.EvidencePackage
 	var complete int

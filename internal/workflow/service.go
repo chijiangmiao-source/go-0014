@@ -32,6 +32,7 @@ type Repository interface {
 	JobForRevision(id string) (domain.AnalysisJob, error)
 	SaveEvidence(domain.EvidencePackage) error
 	Evidence(id string) (domain.EvidencePackage, error)
+	FinalizeRevision(revision domain.Revision, event domain.StateEvent, pkg domain.EvidencePackage) (domain.EvidencePackage, error)
 	SaveReplay(domain.ReplayComparison) error
 	Replay(id string) (domain.ReplayComparison, error)
 }
@@ -244,14 +245,17 @@ func (s *Service) Finalize(id string, expectedVersion int64) (domain.Revision, e
 	if err != nil {
 		return domain.Revision{}, err
 	}
-	if err := s.repo.SaveRevision(next, event); err != nil {
-		return domain.Revision{}, err
-	}
 	pkg.RevisionID = id
 	pkg.Version = next.Version
-	if err := s.repo.SaveEvidence(pkg); err != nil {
+	// Persist the terminal-state migration, the state event and the evidence
+	// archive in a single transaction. If the archive write fails the whole
+	// transaction rolls back, so the revision never enters an unrecoverable
+	// SEALED state without a downloadable evidence package.
+	saved, err := s.repo.FinalizeRevision(next, event, pkg)
+	if err != nil {
 		return domain.Revision{}, err
 	}
+	next.SnapshotHash = saved.Hash
 	return next, nil
 }
 
